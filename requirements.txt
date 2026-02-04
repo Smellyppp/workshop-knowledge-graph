@@ -1,0 +1,18 @@
+# FastAPI and Server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Database
+PyMySQL==1.1.2
+SQLAlchemy==2.0.23
+
+# Security
+passlib==1.7.4
+bcrypt==4.0.1
+python-jose[cryptography]==3.3.0
+cryptography==41.0.7
+
+# Configuration
+pydantic==2.5.0
+pydantic-settings==2.1.0

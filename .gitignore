@@ -1,0 +1,26 @@
+node_modules/
+
+
+############################
+# 2) Python 运行产物 / 缓存
+############################
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+pip-wheel-metadata/
+dist/
+build/
+*.egg-info/
+.eggs/
+.venv/
+venv/
+ENV/
+env/
