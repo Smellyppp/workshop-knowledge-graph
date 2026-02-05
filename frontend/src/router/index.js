@@ -31,6 +31,12 @@ const routes = [
         name: 'Chat',
         component: () => import('@/views/Chat.vue'),
         meta: { requiresAuth: true }  // 需要认证
+      },
+      {
+        path: 'knowledge-graph',
+        name: 'KnowledgeGraph',
+        component: () => import('@/views/KnowledgeGraph.vue'),
+        meta: { requiresAuth: true }  // 需要认证
       }
     ]
   },

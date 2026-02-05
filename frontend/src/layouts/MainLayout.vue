@@ -27,6 +27,10 @@
             <el-icon><ChatDotRound /></el-icon>
             <template #title>智能问答</template>
           </el-menu-item>
+          <el-menu-item index="/knowledge-graph">
+            <el-icon><Share /></el-icon>
+            <template #title>知识图谱</template>
+          </el-menu-item>
         </el-menu>
       </el-aside>
 
@@ -91,7 +95,8 @@ const activeMenu = computed(() => route.path)
 const pageTitle = computed(() => {
   const titleMap = {
     '/users': '用户管理',
-    '/chat': '智能问答'
+    '/chat': '智能问答',
+    '/knowledge-graph': '知识图谱'
   }
   return titleMap[route.path] || '车间资源系统'
 })
