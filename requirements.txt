@@ -17,5 +17,11 @@ python-jose[cryptography]==3.3.0
 cryptography==41.0.7
 
 # Configuration
-pydantic==2.5.0
-pydantic-settings==2.1.0
+pydantic>=2.7.4
+pydantic-settings>=2.1.0
+
+# LangChain and AI
+langchain>=1.0.0
+langchain-openai>=0.3.0
+langchain-core>=0.4.0
+langchain-community>=0.4.0

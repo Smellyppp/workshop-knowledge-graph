@@ -5,6 +5,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import axios from 'axios'
+import request from '@/api/index'
 import { ElMessage } from 'element-plus'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -52,7 +53,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function logout() {
     try {
       // 调用登出接口
-      await axios.post('/api/v1/auth/logout')
+      await request.post('/v1/auth/logout')
     } catch (error) {
       console.error('登出错误:', error)
     } finally {
@@ -70,9 +71,9 @@ export const useAuthStore = defineStore('auth', () => {
    */
   async function fetchCurrentUser() {
     try {
-      const response = await axios.get('/api/v1/auth/me')
-      user.value = response.data
-      localStorage.setItem('user', JSON.stringify(response.data))
+      const response = await request.get('/v1/auth/me')
+      user.value = response
+      localStorage.setItem('user', JSON.stringify(response))
     } catch (error) {
       console.error('获取用户信息错误:', error)
       logout()

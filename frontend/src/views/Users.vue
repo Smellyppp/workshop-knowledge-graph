@@ -225,8 +225,8 @@ const fetchUsers = async () => {
       ...searchForm
     }
     const response = await userApi.getUsers(params)
-    tableData.value = response.data.items
-    pagination.total = response.data.total
+    tableData.value = response.items
+    pagination.total = response.total
   } catch (error) {
     console.error('获取用户列表错误:', error)
   } finally {

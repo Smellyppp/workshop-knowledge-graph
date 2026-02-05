@@ -2,19 +2,25 @@
 知识图谱 API 接口
 提供知识图谱关键词检索和可视化功能
 """
-from fastapi import APIRouter, HTTPException, status, Query
+from fastapi import APIRouter, HTTPException, status, Query, Request, Depends
+from sqlalchemy.orm import Session
+
+from app.models.user import get_db
 from app.schemas.knowledge_graph import (
     GraphDataResponse,
     GraphStatistics
 )
 from app.services.knowledge_graph_service import KnowledgeGraphService
+from app.services.operation_log_service import OperationLogService
+from app.core.deps import get_current_user
+from app.core.logger_helper import log_operation
 
 # 创建路由器
 router = APIRouter()
 
 
 @router.get("/statistics", response_model=GraphStatistics, summary="获取图谱统计信息")
-def get_statistics():
+async def get_statistics():
     """
     获取知识图谱的统计信息
 
@@ -35,9 +41,12 @@ def get_statistics():
 
 
 @router.post("/search", summary="关键词搜索")
-def search_nodes(
+async def search_nodes(
+    request: Request,
     keyword: str = Query(..., description="搜索关键词", min_length=1),
-    limit: int = Query(100, ge=1, le=1000, description="最大返回结果数")
+    limit: int = Query(100, ge=1, le=1000, description="最大返回结果数"),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """
     根据 title 字段搜索节点，返回节点和关系用于可视化
@@ -54,9 +63,34 @@ def search_nodes(
             keyword=keyword,
             limit=limit
         )
+
+        # 记录搜索日志（不记录搜索的具体内容）
+        await log_operation(
+            db=db,
+            user_id=current_user.get("id"),
+            username=current_user.get("username"),
+            action_type=OperationLogService.ACTION_SEARCH,
+            module=OperationLogService.MODULE_KNOWLEDGE_GRAPH,
+            request=request,
+            status=1,
+            remark="执行关键词搜索"
+        )
+
         return result
 
     except Exception as e:
+        # 记录搜索失败日志
+        await log_operation(
+            db=db,
+            user_id=current_user.get("id"),
+            username=current_user.get("username"),
+            action_type=OperationLogService.ACTION_SEARCH,
+            module=OperationLogService.MODULE_KNOWLEDGE_GRAPH,
+            request=request,
+            status=0,
+            remark=f"搜索失败: {str(e)}"
+        )
+
         import traceback
         import logging
         logging.error(f"搜索失败详细错误: {traceback.format_exc()}")
@@ -67,8 +101,11 @@ def search_nodes(
 
 
 @router.get("/graph-data", summary="获取图谱数据用于可视化")
-def get_graph_data(
-    limit: int = Query(100, ge=1, le=1000, description="最大节点数")
+async def get_graph_data(
+    request: Request,
+    limit: int = Query(100, ge=1, le=1000, description="最大节点数"),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """
     获取图谱数据（节点和关系）用于可视化展示
@@ -81,6 +118,19 @@ def get_graph_data(
     """
     try:
         data = KnowledgeGraphService.get_graph_data(limit=limit)
+
+        # 记录查询日志
+        await log_operation(
+            db=db,
+            user_id=current_user.get("id"),
+            username=current_user.get("username"),
+            action_type=OperationLogService.ACTION_QUERY,
+            module=OperationLogService.MODULE_KNOWLEDGE_GRAPH,
+            request=request,
+            status=1,
+            remark=f"获取图谱数据，限制: {limit}"
+        )
+
         return data
     except Exception as e:
         import traceback
@@ -111,9 +161,12 @@ def health_check():
 
 
 @router.get("/neighbors/{node_id}", summary="获取节点的邻居")
-def get_node_neighbors(
+async def get_node_neighbors(
+    request: Request,
     node_id: str,
-    depth: int = Query(1, ge=1, le=3, description="扩展深度")
+    depth: int = Query(1, ge=1, le=3, description="扩展深度"),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """
     获取指定节点的邻居节点和关系，用于点击展开
@@ -130,6 +183,19 @@ def get_node_neighbors(
             node_id=node_id,
             depth=depth
         )
+
+        # 记录查询日志
+        await log_operation(
+            db=db,
+            user_id=current_user.get("id"),
+            username=current_user.get("username"),
+            action_type=OperationLogService.ACTION_QUERY,
+            module=OperationLogService.MODULE_KNOWLEDGE_GRAPH,
+            request=request,
+            status=1,
+            remark=f"获取节点邻居，节点ID: {node_id}"
+        )
+
         return result
     except Exception as e:
         import traceback

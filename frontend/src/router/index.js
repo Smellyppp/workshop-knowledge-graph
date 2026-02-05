@@ -37,6 +37,12 @@ const routes = [
         name: 'KnowledgeGraph',
         component: () => import('@/views/KnowledgeGraph.vue'),
         meta: { requiresAuth: true }  // 需要认证
+      },
+      {
+        path: 'operation-logs',
+        name: 'OperationLogs',
+        component: () => import('@/views/OperationLogs.vue'),
+        meta: { requiresAuth: true, requiresAdmin: true }  // 需要认证且需要管理员权限
       }
     ]
   },
@@ -60,6 +66,10 @@ router.beforeEach((to, from, next) => {
   // 需要认证但未登录，跳转到登录页
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next('/login')
+  }
+  // 需要管理员权限但不是管理员，跳转到用户列表页
+  else if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    next('/users')
   }
   // 已登录用户访问登录页，跳转到用户列表页
   else if (to.path === '/login' && authStore.isAuthenticated) {

@@ -9,7 +9,7 @@ import router from '@/router'
 // 创建 axios 实例
 const request = axios.create({
   baseURL: '/api',
-  timeout: 10000  // 请求超时时间
+  timeout: 60000  // 请求超时时间（AI调用需要更长时间，设为60秒）
 })
 
 // 请求拦截器：自动添加认证令牌
@@ -29,7 +29,8 @@ request.interceptors.request.use(
 // 响应拦截器：统一处理错误
 request.interceptors.response.use(
   (response) => {
-    return response
+    // 直接返回响应数据，简化前端调用
+    return response.data
   },
   (error) => {
     // 根据状态码显示错误信息

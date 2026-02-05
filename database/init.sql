@@ -1,6 +1,6 @@
 -- 用户管理数据库初始化脚本
 -- 数据库：workshop
--- 表：user_manage
+-- 表：user_manage, operation_log
 
 -- 如果数据库不存在则创建
 CREATE DATABASE IF NOT EXISTS `workshop` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -8,6 +8,7 @@ CREATE DATABASE IF NOT EXISTS `workshop` DEFAULT CHARACTER SET utf8mb4 COLLATE u
 USE `workshop`;
 
 -- 如果表存在则删除
+DROP TABLE IF EXISTS `operation_log`;
 DROP TABLE IF EXISTS `user_manage`;
 
 -- 创建用户管理表
@@ -25,6 +26,29 @@ CREATE TABLE `user_manage` (
     KEY `idx_user_type` (`user_type`),
     KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户管理表';
+
+-- 创建操作日志表
+CREATE TABLE `operation_log` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '日志ID',
+    `user_id` BIGINT NOT NULL COMMENT '操作用户ID',
+    `username` VARCHAR(50) NOT NULL COMMENT '操作用户名',
+    `action_type` VARCHAR(50) NOT NULL COMMENT '行为类型',
+    `module` VARCHAR(50) NOT NULL COMMENT '操作模块',
+    `ip_address` VARCHAR(50) DEFAULT NULL COMMENT '操作IP地址',
+    `user_agent` VARCHAR(500) DEFAULT NULL COMMENT '用户代理信息',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
+    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '操作状态: 1=成功, 0=失败',
+    `remark` VARCHAR(500) DEFAULT NULL COMMENT '备注信息',
+    PRIMARY KEY (`id`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_username` (`username`),
+    KEY `idx_action_type` (`action_type`),
+    KEY `idx_module` (`module`),
+    KEY `idx_created_at` (`created_at`),
+    KEY `idx_user_time` (`user_id`, `created_at`),
+    KEY `idx_module_time` (`module`, `created_at`),
+    KEY `idx_action_time` (`action_type`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='操作日志表';
 
 -- 插入默认管理员用户 (用户名: admin, 密码: admin123)
 -- 密码已 bcrypt 加密

@@ -3,20 +3,23 @@
 处理用户的增删改查操作
 """
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 
 from app.models.user import get_db, UserManage
 from app.schemas.user import UserCreate, UserUpdate, UserResponse, UserListResponse
 from app.services.user_service import UserService
+from app.services.operation_log_service import OperationLogService
 from app.core.deps import get_current_user, get_current_admin
+from app.core.logger_helper import log_operation
 
 # 创建路由器
 router = APIRouter()
 
 
 @router.get("", response_model=UserListResponse, summary="获取用户列表")
-def get_users(
+async def get_users(
+    request: Request,
     skip: int = Query(0, ge=0, description="跳过记录数"),
     limit: int = Query(10, ge=1, le=100, description="每页记录数"),
     username: Optional[str] = Query(None, description="用户名筛选"),
@@ -53,11 +56,23 @@ def get_users(
     users, total = UserService.get_users(db, skip, limit, username, user_type, status)
     items = [UserResponse.model_validate(user) for user in users]
 
+    # 记录查询日志
+    await log_operation(
+        db=db,
+        user_id=current_user.get("id"),
+        username=current_user.get("username"),
+        action_type=OperationLogService.ACTION_QUERY,
+        module=OperationLogService.MODULE_USER_MANAGEMENT,
+        request=request,
+        status=1
+    )
+
     return UserListResponse(total=total, items=items)
 
 
 @router.get("/{user_id}", response_model=UserResponse, summary="获取用户详情")
-def get_user(
+async def get_user(
+    request: Request,
     user_id: int,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
@@ -89,11 +104,25 @@ def get_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="用户不存在"
         )
+
+    # 记录查询日志
+    await log_operation(
+        db=db,
+        user_id=current_user.get("id"),
+        username=current_user.get("username"),
+        action_type=OperationLogService.ACTION_QUERY,
+        module=OperationLogService.MODULE_USER_MANAGEMENT,
+        request=request,
+        status=1,
+        remark=f"查询用户: {user.username}"
+    )
+
     return UserResponse.model_validate(user)
 
 
 @router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED, summary="创建用户")
-def create_user(
+async def create_user(
+    request: Request,
     user_data: UserCreate,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_admin)
@@ -113,6 +142,17 @@ def create_user(
         HTTPException: 用户名已存在或权限不足
     """
     if UserService.username_exists(db, user_data.username):
+        # 记录创建失败日志
+        await log_operation(
+            db=db,
+            user_id=current_user.get("id"),
+            username=current_user.get("username"),
+            action_type=OperationLogService.ACTION_CREATE,
+            module=OperationLogService.MODULE_USER_MANAGEMENT,
+            request=request,
+            status=0,
+            remark=f"创建用户失败: 用户名 {user_data.username} 已存在"
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="用户名已存在"
@@ -124,11 +164,25 @@ def create_user(
         password=user_data.password,
         user_type=user_data.user_type
     )
+
+    # 记录创建成功日志
+    await log_operation(
+        db=db,
+        user_id=current_user.get("id"),
+        username=current_user.get("username"),
+        action_type=OperationLogService.ACTION_CREATE,
+        module=OperationLogService.MODULE_USER_MANAGEMENT,
+        request=request,
+        status=1,
+        remark=f"创建用户: {user.username}"
+    )
+
     return UserResponse.model_validate(user)
 
 
 @router.put("/{user_id}", response_model=UserResponse, summary="更新用户")
-def update_user(
+async def update_user(
+    request: Request,
     user_id: int,
     user_data: UserUpdate,
     db: Session = Depends(get_db),
@@ -184,11 +238,24 @@ def update_user(
     if user_data.status is not None and is_admin:
         user = UserService.update_user_status(db, user_id, user_data.status)
 
+    # 记录更新日志
+    await log_operation(
+        db=db,
+        user_id=current_user.get("id"),
+        username=current_user.get("username"),
+        action_type=OperationLogService.ACTION_UPDATE,
+        module=OperationLogService.MODULE_USER_MANAGEMENT,
+        request=request,
+        status=1,
+        remark=f"更新用户: {user.username}"
+    )
+
     return UserResponse.model_validate(user)
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, summary="删除用户")
-def delete_user(
+async def delete_user(
+    request: Request,
     user_id: int,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_admin)
@@ -211,5 +278,19 @@ def delete_user(
             detail="用户不存在"
         )
 
+    username = user.username
     UserService.delete_user(db, user_id)
+
+    # 记录删除日志
+    await log_operation(
+        db=db,
+        user_id=current_user.get("id"),
+        username=current_user.get("username"),
+        action_type=OperationLogService.ACTION_DELETE,
+        module=OperationLogService.MODULE_USER_MANAGEMENT,
+        request=request,
+        status=1,
+        remark=f"删除用户: {username}"
+    )
+
     return None

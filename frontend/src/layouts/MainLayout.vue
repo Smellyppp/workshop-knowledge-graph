@@ -31,6 +31,11 @@
             <el-icon><Share /></el-icon>
             <template #title>知识图谱</template>
           </el-menu-item>
+          <!-- 操作日志菜单：仅管理员可见 -->
+          <el-menu-item v-if="authStore.isAdmin" index="/operation-logs">
+            <el-icon><Document /></el-icon>
+            <template #title>操作日志</template>
+          </el-menu-item>
         </el-menu>
       </el-aside>
 
@@ -96,7 +101,8 @@ const pageTitle = computed(() => {
   const titleMap = {
     '/users': '用户管理',
     '/chat': '智能问答',
-    '/knowledge-graph': '知识图谱'
+    '/knowledge-graph': '知识图谱',
+    '/operation-logs': '操作日志'
   }
   return titleMap[route.path] || '车间资源系统'
 })

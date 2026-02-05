@@ -2,6 +2,12 @@
 应用程序配置模块
 """
 from pydantic_settings import BaseSettings
+from pathlib import Path
+
+
+# 获取项目根目录（backend目录）
+# config.py 在 backend/app/core/ 下，需要往上3层到 backend/
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 
 class Settings(BaseSettings):
@@ -25,13 +31,23 @@ class Settings(BaseSettings):
     NEO4J_PASSWORD: str = "1314520gyf"
     NEO4J_DATABASE: str = "neo4j"
 
+    # Qwen 大模型配置
+    # 注意：QWEN_API_KEY 需要在 .env 文件中配置，不要在此处显示
+    QWEN_API_URL: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    QWEN_API_KEY: str  # 从环境变量读取
+    QWEN_MODEL: str = "qwen-plus"
+    # 对话记忆轮数限制
+    CHAT_MEMORY_LIMIT: int = 3
+
     @property
     def DATABASE_URL(self) -> str:
         """生成数据库连接 URL"""
         return f"mysql+pymysql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
     class Config:
-        env_file = ".env"  # 环境变量文件
+        # 使用绝对路径，确保从任何目录运行都能找到 .env 文件
+        env_file = BASE_DIR / ".env"
+        env_file_encoding = "utf-8"
 
 
 # 创建全局配置实例

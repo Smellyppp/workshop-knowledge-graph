@@ -143,8 +143,8 @@ const handleNodeClick = async ({ nodeId, node }) => {
 const expandNode = async (nodeId) => {
   try {
     const response = await knowledgeGraphApi.getNodeNeighbors(nodeId, 1)
-    const neighborNodes = response.data.nodes || []
-    const neighborEdges = response.data.edges || []
+    const neighborNodes = response.nodes || []
+    const neighborEdges = response.edges || []
 
     if (neighborNodes.length === 0) {
       ElMessage.info('该节点没有邻居节点')
@@ -249,9 +249,9 @@ const checkConnection = async () => {
   try {
     const response = await knowledgeGraphApi.healthCheck()
     Object.assign(connectionStatus, {
-      connected: response.data.neo4j_connected || false,
-      node_count: response.data.details?.node_count,
-      relationship_count: response.data.details?.relationship_count
+      connected: response.neo4j_connected || false,
+      node_count: response.details?.node_count,
+      relationship_count: response.details?.relationship_count
     })
 
     if (connectionStatus.connected) {
@@ -275,8 +275,8 @@ const loadGraphData = async () => {
   loading.value = true
   try {
     const response = await knowledgeGraphApi.getGraphData(dataLimit.value)
-    graphData.nodes = response.data.nodes || []
-    graphData.edges = response.data.edges || []
+    graphData.nodes = response.nodes || []
+    graphData.edges = response.edges || []
 
     if (graphData.nodes.length > 0) {
       ElMessage.success(`加载成功：${graphData.nodes.length} 个节点，${graphData.edges.length} 条关系`)
@@ -306,8 +306,8 @@ const handleSearch = async () => {
 
   try {
     const response = await knowledgeGraphApi.searchNodes(searchKeyword.value, dataLimit.value)
-    graphData.nodes = response.data.nodes || []
-    graphData.edges = response.data.edges || []
+    graphData.nodes = response.nodes || []
+    graphData.edges = response.edges || []
 
     // 清空展开记录
     nodeExpansionMap.value.clear()
