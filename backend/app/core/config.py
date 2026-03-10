@@ -13,31 +13,43 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 class Settings(BaseSettings):
     """应用配置类"""
 
+    # =========================
     # 数据库配置
-    DB_HOST: str = "localhost"
-    DB_PORT: int = 3306
-    DB_USER: str = "root"
-    DB_PASSWORD: str = "123456"
-    DB_NAME: str = "workshop"
+    # =========================
+    DB_HOST: str
+    DB_PORT: int
+    DB_USER: str
+    DB_PASSWORD: str
+    DB_NAME: str
 
+    # =========================
     # JWT 配置
-    SECRET_KEY: str = "your-secret-key-change-in-production"  # 生产环境请修改
-    ALGORITHM: str = "HS256"  # JWT 加密算法
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 访问令牌有效期（24小时）
+    # =========================
+    SECRET_KEY: str
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
 
+    # =========================
     # Neo4j 配置
-    NEO4J_URI: str = "bolt://localhost:7687"
-    NEO4J_USER: str = "neo4j"
-    NEO4J_PASSWORD: str = "1314520gyf"
-    NEO4J_DATABASE: str = "neo4j"
+    # =========================
+    NEO4J_URI: str
+    NEO4J_USER: str
+    NEO4J_PASSWORD: str
+    NEO4J_DATABASE: str
 
+    # =========================
     # Qwen 大模型配置
-    # 注意：QWEN_API_KEY 需要在 .env 文件中配置，不要在此处显示
-    QWEN_API_URL: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    QWEN_API_KEY: str  # 从环境变量读取
-    QWEN_MODEL: str = "qwen-plus"
+    # =========================
+    QWEN_API_URL: str
+    QWEN_API_KEY: str
+    QWEN_MODEL: str
     # 对话记忆轮数限制
     CHAT_MEMORY_LIMIT: int = 3
+
+    # =========================
+    # 前端配置
+    # =========================
+    FRONTEND_URL: str = "http://localhost:5173"
 
     @property
     def DATABASE_URL(self) -> str:

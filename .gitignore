@@ -1,37 +1,28 @@
-############################
-# 1) 配置与密钥（不要提交）
-############################
+# 环境配置（不提交）
 .env
-.env.*            # 如 .env.local / .env.dev（如需保留示例文件可单独放开）
-!.env.example     # 保留示例文件（如果你有）
+.env.*
 
-
-node_modules/
-
-
-############################
-# 2) Python 运行产物 / 缓存
-############################
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-.coverage.*
-htmlcov/
-.tox/
-.nox/
-pip-wheel-metadata/
-dist/
-build/
-*.egg-info/
-.eggs/
 .venv/
 venv/
-ENV/
-env/
+.pytest_cache/
 
+# Node.js
+node_modules/
+*.log
+dist/
 
+# IDE
+.vscode/
+.idea/
 
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 项目特定
+finallyproject-main/
+.claude/
+.trae/

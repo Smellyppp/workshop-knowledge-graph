@@ -28,7 +28,7 @@ app = FastAPI(
 # 配置 CORS 中间件（跨域资源共享）
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],  # 允许的前端地址
+    allow_origins=[settings.FRONTEND_URL, "http://localhost:3000"],  # 从配置读取前端地址
     allow_credentials=True,  # 允许携带凭证
     allow_methods=["*"],  # 允许所有 HTTP 方法
     allow_headers=["*"],  # 允许所有请求头

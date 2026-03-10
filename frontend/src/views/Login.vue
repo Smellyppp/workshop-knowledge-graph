@@ -40,11 +40,6 @@
           </el-button>
         </el-form-item>
       </el-form>
-      <div class="tips">
-        <p>默认账号：</p>
-        <p>管理员：admin / admin123</p>
-        <p>普通用户：user1 / user123</p>
-      </div>
     </div>
   </div>
 </template>
@@ -126,18 +121,5 @@ const handleLogin = async () => {
 
 .login-form {
   margin-top: 20px;
-}
-
-.tips {
-  margin-top: 20px;
-  padding: 10px;
-  background: #f5f7fa;
-  border-radius: 4px;
-  font-size: 12px;
-  color: #606266;
-}
-
-.tips p {
-  margin: 5px 0;
 }
 </style>
