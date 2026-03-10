@@ -22,7 +22,7 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 app = FastAPI(
     title="车间资源系统 API",
     description="基于 FastAPI 和 MySQL 的车间资源管理系统",
-    version="1.0.0"
+    version="1.4.0"
 )
 
 # 配置 CORS 中间件（跨域资源共享）
@@ -41,7 +41,7 @@ app.include_router(api_router, prefix="/api")
 @app.get("/")
 def root():
     """根路径接口"""
-    return {"message": "车间资源系统 API", "version": "1.0.0"}
+    return {"message": "车间资源系统 API", "version": "1.4.0"}
 
 
 @app.get("/health")

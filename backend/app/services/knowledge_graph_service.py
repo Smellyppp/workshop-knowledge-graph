@@ -12,10 +12,35 @@ logger = logging.getLogger(__name__)
 class KnowledgeGraphService:
     """知识图谱服务类"""
 
+    # 可搜索的字段列表（按节点类型）
+    SEARCH_FIELDS = {
+        '设备': ['设备名称', '设备型号', '所在工位'],
+        '人员': ['姓名', '工号'],
+        '工艺': ['工艺名称', '工艺编号'],
+        '物料': ['物料名称', '物料编号'],
+        '故障': ['故障名称', '故障现象', '故障原因'],
+        '加工设备': ['设备名称', '设备型号', '所在工位'],
+        '检测设备': ['设备名称', '设备型号', '所在工位'],
+        '物流设备': ['设备名称', '设备型号', '所在工位'],
+        '辅助设备': ['设备名称', '设备型号', '所在工位'],
+        '操作人员': ['姓名', '工号'],
+        '技术人员': ['姓名', '工号'],
+        '管理人员': ['姓名', '工号'],
+        '原材料': ['物料名称', '物料编号'],
+        '半成品': ['物料名称', '物料编号'],
+        '成品': ['物料名称', '物料编号'],
+        '辅料': ['物料名称', '物料编号'],
+        '加工工艺': ['工艺名称', '工艺编号'],
+        '检测工艺': ['工艺名称', '工艺编号'],
+        '装配工艺': ['工艺名称', '工艺编号'],
+    }
+
     @staticmethod
     def search_all_nodes(keyword: str, limit: int = 100) -> Dict[str, Any]:
         """
-        根据 title 字段搜索节点，并返回相关的关系数据
+        多字段智能搜索节点
+
+        在所有可搜索字段中进行模糊匹配
 
         Args:
             keyword: 关键词
@@ -24,63 +49,18 @@ class KnowledgeGraphService:
         Returns:
             包含节点和关系的字典
         """
-        # 搜索匹配的节点，使用显式投影返回完整的节点信息
-        search_query = """
-        MATCH (n)
-        WHERE toLower(toString(n.title)) CONTAINS toLower($keyword)
-        RETURN elementId(n) as id, labels(n) as labels, properties(n) as properties
-        LIMIT $limit
-        """
+        if not keyword or not keyword.strip():
+            return {"nodes": [], "edges": []}
+
+        keyword = keyword.strip()
 
         try:
-            # 搜索节点
-            results = neo4j_client.execute_query(
-                search_query,
-                {"keyword": keyword, "limit": limit}
-            )
-
-            nodes = []
-            node_ids = []
-
-            for record in results:
-                node_id = record.get("id")
-                node_labels = record.get("labels", [])
-                node_properties = record.get("properties", {})
-
-                if node_id is not None:
-                    node_ids.append(node_id)
-                    nodes.append({
-                        "id": node_id,
-                        "labels": node_labels if isinstance(node_labels, list) else [],
-                        "properties": node_properties if isinstance(node_properties, dict) else {}
-                    })
+            nodes, node_ids = KnowledgeGraphService._search_by_multiple_fields(keyword, limit)
 
             # 获取这些节点之间的关系
             edges = []
             if node_ids:
-                batch_size = 100
-                for i in range(0, len(node_ids), batch_size):
-                    batch = node_ids[i:i + batch_size]
-                    rel_query = """
-                    MATCH (a)-[r]-(b)
-                    WHERE elementId(a) IN $node_ids AND elementId(b) IN $node_ids
-                    RETURN elementId(a) as from_node, elementId(b) as to_node, type(r) as type, elementId(r) as rel_id
-                    """
-
-                    rel_results = neo4j_client.execute_query(rel_query, {"node_ids": batch})
-                    for rel_record in rel_results:
-                        from_id = rel_record.get("from_node")
-                        to_id = rel_record.get("to_node")
-                        rel_id = rel_record.get("rel_id")
-                        rel_type = rel_record.get("type", "")
-
-                        if from_id and to_id and rel_id is not None:
-                            edges.append({
-                                "id": rel_id,
-                                "from_node": from_id,
-                                "to_node": to_id,
-                                "type": rel_type
-                            })
+                edges = KnowledgeGraphService._get_relations_between_nodes(node_ids)
 
             logger.info(f"搜索 '{keyword}' 找到 {len(nodes)} 个节点, {len(edges)} 条关系")
             return {
@@ -89,8 +69,98 @@ class KnowledgeGraphService:
             }
 
         except Exception as e:
-            logger.error(f"搜索节点失败: {e}")
-            raise
+            logger.error(f"搜索失败: {e}")
+            return {"nodes": [], "edges": []}
+
+    @staticmethod
+    def _search_by_multiple_fields(keyword: str, limit: int) -> tuple:
+        """
+        多字段模糊匹配搜索
+
+        Returns:
+            tuple: (节点列表, 节点ID列表)
+        """
+        # 构建所有可搜索字段的列表
+        all_fields = []
+        for fields in KnowledgeGraphService.SEARCH_FIELDS.values():
+            all_fields.extend(fields)
+        all_fields = list(set(all_fields))  # 去重
+
+        # 构建 WHERE 条件
+        where_conditions = []
+        for field in all_fields:
+            where_conditions.append(f"toString(n.{field}) CONTAINS $keyword")
+
+        where_clause = " OR ".join(where_conditions)
+
+        search_query = f"""
+        MATCH (n)
+        WHERE {where_clause}
+        RETURN elementId(n) as id, labels(n) as labels, properties(n) as properties
+        LIMIT $limit
+        """
+
+        results = neo4j_client.execute_query(
+            search_query,
+            {"keyword": keyword, "limit": limit}
+        )
+
+        nodes = []
+        node_ids = []
+
+        for record in results:
+            node_id = record.get("id")
+            node_labels = record.get("labels", [])
+            node_properties = record.get("properties", {})
+
+            if node_id is not None:
+                node_ids.append(node_id)
+                nodes.append({
+                    "id": node_id,
+                    "labels": node_labels if isinstance(node_labels, list) else [],
+                    "properties": node_properties if isinstance(node_properties, dict) else {}
+                })
+
+        return nodes, node_ids
+
+    @staticmethod
+    def _get_relations_between_nodes(node_ids: list) -> list:
+        """
+        获取指定节点列表之间的关系
+
+        Args:
+            node_ids: 节点ID列表
+
+        Returns:
+            list: 关系列表
+        """
+        edges = []
+        batch_size = 100
+
+        for i in range(0, len(node_ids), batch_size):
+            batch = node_ids[i:i + batch_size]
+            rel_query = """
+            MATCH (a)-[r]-(b)
+            WHERE elementId(a) IN $node_ids AND elementId(b) IN $node_ids
+            RETURN elementId(a) as from_node, elementId(b) as to_node, type(r) as type, elementId(r) as rel_id
+            """
+
+            rel_results = neo4j_client.execute_query(rel_query, {"node_ids": batch})
+            for rel_record in rel_results:
+                from_id = rel_record.get("from_node")
+                to_id = rel_record.get("to_node")
+                rel_id = rel_record.get("rel_id")
+                rel_type = rel_record.get("type", "")
+
+                if from_id and to_id and rel_id is not None:
+                    edges.append({
+                        "id": rel_id,
+                        "from_node": from_id,
+                        "to_node": to_id,
+                        "type": rel_type
+                    })
+
+        return edges
 
     @staticmethod
     def get_node_neighbors(node_id: str, depth: int = 1) -> Dict[str, Any]:
@@ -205,7 +275,6 @@ class KnowledgeGraphService:
             results = neo4j_client.execute_query(nodes_query, {"limit": limit})
 
             nodes = []
-            edges = []
             node_ids = []
 
             for record in results:
@@ -222,30 +291,7 @@ class KnowledgeGraphService:
                     })
 
             # 获取这些节点之间的关系
-            if node_ids:
-                batch_size = 100
-                for i in range(0, len(node_ids), batch_size):
-                    batch = node_ids[i:i + batch_size]
-                    rel_query = """
-                    MATCH (a)-[r]-(b)
-                    WHERE elementId(a) IN $node_ids AND elementId(b) IN $node_ids
-                    RETURN elementId(a) as from_node, elementId(b) as to_node, type(r) as type, elementId(r) as rel_id
-                    """
-
-                    rel_results = neo4j_client.execute_query(rel_query, {"node_ids": batch})
-                    for rel_record in rel_results:
-                        from_id = rel_record.get("from_node")
-                        to_id = rel_record.get("to_node")
-                        rel_id = rel_record.get("rel_id")
-                        rel_type = rel_record.get("type", "")
-
-                        if from_id and to_id and rel_id is not None:
-                            edges.append({
-                                "id": rel_id,
-                                "from_node": from_id,
-                                "to_node": to_id,
-                                "type": rel_type
-                            })
+            edges = KnowledgeGraphService._get_relations_between_nodes(node_ids)
 
             logger.info(f"获取图谱数据成功: {len(nodes)} 个节点, {len(edges)} 条关系")
             return {

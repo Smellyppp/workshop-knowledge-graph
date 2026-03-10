@@ -49,7 +49,9 @@ async def search_nodes(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    根据 title 字段搜索节点，返回节点和关系用于可视化
+    多字段智能搜索节点（全文索引 + 多字段回退）
+
+    支持搜索字段：设备名称、设备型号、姓名、工艺名称、物料名称、故障名称、故障现象等
 
     Args:
         keyword: 搜索关键词

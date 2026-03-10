@@ -39,7 +39,7 @@
         <el-col :span="10">
           <el-input
             v-model="searchKeyword"
-            placeholder="搜索 title 字段..."
+            placeholder="搜索设备名称、姓名、工艺名称等..."
             clearable
             @keyup.enter="handleSearch"
           >
