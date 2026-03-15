@@ -7,6 +7,9 @@ from typing import Optional, Dict, Any, List
 from app.core.config import settings
 import logging
 
+# 配置 neo4j.notifications 日志级别为 WARNING，抑制 INFO 消息
+logging.getLogger('neo4j.notifications').setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 

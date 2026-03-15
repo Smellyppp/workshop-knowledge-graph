@@ -7,8 +7,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_admin
-from app.models.user import get_db
-from app.models.operation_log import OperationLog
+from app.models import get_db, OperationLog
 from app.schemas.operation_log import (
     OperationLogResponse,
     OperationLogListResponse,

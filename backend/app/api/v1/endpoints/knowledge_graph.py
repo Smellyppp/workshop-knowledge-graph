@@ -5,7 +5,7 @@
 from fastapi import APIRouter, HTTPException, status, Query, Request, Depends
 from sqlalchemy.orm import Session
 
-from app.models.user import get_db
+from app.models import get_db
 from app.schemas.knowledge_graph import (
     GraphDataResponse,
     GraphStatistics

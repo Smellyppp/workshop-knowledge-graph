@@ -26,3 +26,6 @@ Thumbs.db
 finallyproject-main/
 .claude/
 .trae/
+
+# 数据库上传文件
+database/data/

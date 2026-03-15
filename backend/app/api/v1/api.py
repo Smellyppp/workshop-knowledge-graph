@@ -4,7 +4,7 @@ API 路由主入口
 """
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, users, knowledge_graph, chat, operation_log
+from app.api.v1.endpoints import auth, users, knowledge_graph, chat, operation_log, data_import
 
 # 创建 API 路由器
 api_router = APIRouter()
@@ -23,3 +23,6 @@ api_router.include_router(chat.router, prefix="/v1/chat", tags=["智能问答"])
 
 # 注册操作日志相关路由
 api_router.include_router(operation_log.router, prefix="/v1", tags=["操作日志"])
+
+# 注册数据导入相关路由
+api_router.include_router(data_import.router, prefix="/v1/data-import", tags=["数据导入"])

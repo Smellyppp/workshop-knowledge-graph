@@ -4,6 +4,7 @@
 """
 import sys
 import io
+import os
 from pathlib import Path
 
 # 设置标准输出编码为 UTF-8
@@ -63,7 +64,7 @@ def init_database():
         # =========================
         # 1. 创建数据库
         # =========================
-        print("\n[1/5] 创建数据库...")
+        print("\n[1/6] 创建数据库...")
         db_name = os.getenv('DB_NAME', 'workshop')
         cursor.execute(f"""
             CREATE DATABASE IF NOT EXISTS `{db_name}`
@@ -76,15 +77,16 @@ def init_database():
         # =========================
         # 2. 删除旧表
         # =========================
-        print("\n[2/5] 清理旧表...")
+        print("\n[2/6] 清理旧表...")
         cursor.execute("DROP TABLE IF EXISTS `operation_log`;")
         cursor.execute("DROP TABLE IF EXISTS `user_manage`;")
+        cursor.execute("DROP TABLE IF EXISTS `file_upload_record`;")
         print("✓ 旧表已清理")
 
         # =========================
         # 3. 创建用户管理表
         # =========================
-        print("\n[3/5] 创建用户管理表...")
+        print("\n[3/6] 创建用户管理表...")
         create_table_sql = """
             CREATE TABLE `user_manage` (
                 `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '用户ID',
@@ -107,7 +109,7 @@ def init_database():
         # =========================
         # 4. 创建操作日志表
         # =========================
-        print("\n[4/5] 创建操作日志表...")
+        print("\n[4/6] 创建操作日志表...")
         log_table_sql = """
             CREATE TABLE `operation_log` (
                 `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '日志ID',
@@ -132,9 +134,44 @@ def init_database():
         print("✓ operation_log 表已创建")
 
         # =========================
-        # 5. 插入默认用户（密码加密）
+        # 5. 创建文件上传记录表
         # =========================
-        print("\n[5/5] 插入默认用户...")
+        print("\n[5/6] 创建文件上传记录表...")
+        file_upload_table_sql = """
+            CREATE TABLE `file_upload_record` (
+                `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '记录ID',
+                `file_id` VARCHAR(64) NOT NULL COMMENT '文件唯一ID（UUID）',
+                `filename` VARCHAR(255) NOT NULL COMMENT '原始文件名',
+                `file_path` VARCHAR(500) NOT NULL COMMENT '文件存储路径',
+                `file_size` BIGINT NOT NULL COMMENT '文件大小（字节）',
+                `uploader_id` BIGINT NOT NULL COMMENT '上传者用户ID',
+                `uploader_name` VARCHAR(50) NOT NULL COMMENT '上传者用户名',
+                `import_status` VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT '导入状态: pending=待导入, importing=导入中, success=成功, failed=失败',
+                `device_count` INT DEFAULT 0 COMMENT '设备节点数',
+                `person_count` INT DEFAULT 0 COMMENT '人员节点数',
+                `material_count` INT DEFAULT 0 COMMENT '物料节点数',
+                `process_count` INT DEFAULT 0 COMMENT '工艺节点数',
+                `fault_count` INT DEFAULT 0 COMMENT '故障节点数',
+                `relation_count` INT DEFAULT 0 COMMENT '关系数量',
+                `total_nodes` INT DEFAULT 0 COMMENT '总节点数',
+                `duration_seconds` FLOAT DEFAULT 0 COMMENT '导入耗时（秒）',
+                `error_message` TEXT COMMENT '错误信息',
+                `upload_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
+                `import_time` DATETIME COMMENT '导入完成时间',
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `uk_file_id` (`file_id`),
+                KEY `idx_uploader_id` (`uploader_id`),
+                KEY `idx_import_status` (`import_status`),
+                KEY `idx_upload_time` (`upload_time`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文件上传记录表';
+        """
+        cursor.execute(file_upload_table_sql)
+        print("✓ file_upload_record 表已创建")
+
+        # =========================
+        # 6. 插入默认用户（密码加密）
+        # =========================
+        print("\n[6/6] 插入默认用户...")
         insert_sql = """
             INSERT INTO `user_manage` (`username`, `password`, `user_type`, `status`, `role_id`)
             VALUES (%s, %s, %s, 1, %s);

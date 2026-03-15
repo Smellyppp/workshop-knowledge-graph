@@ -5,7 +5,7 @@
 from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
 
-from app.models.user import UserManage
+from app.models import UserManage
 from app.core.security import verify_password, get_password_hash
 
 

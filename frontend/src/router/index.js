@@ -39,6 +39,12 @@ const routes = [
         meta: { requiresAuth: true }  // 需要认证
       },
       {
+        path: 'data-import',
+        name: 'DataImport',
+        component: () => import('@/views/DataImport.vue'),
+        meta: { requiresAuth: true, requiresAdmin: true }  // 需要认证且需要管理员权限
+      },
+      {
         path: 'operation-logs',
         name: 'OperationLogs',
         component: () => import('@/views/OperationLogs.vue'),

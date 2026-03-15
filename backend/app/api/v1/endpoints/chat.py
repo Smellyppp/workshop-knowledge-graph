@@ -5,7 +5,7 @@
 from fastapi import APIRouter, Request, Depends
 from sqlalchemy.orm import Session
 
-from app.models.user import get_db
+from app.models import get_db
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.chat_service import ChatService
 from app.services.operation_log_service import OperationLogService

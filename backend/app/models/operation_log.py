@@ -5,7 +5,7 @@
 from datetime import datetime
 from sqlalchemy import Column, BigInteger, String, Integer, DateTime, Index
 
-from app.models.user import Base
+from app.models.base import Base
 
 
 class OperationLog(Base):
@@ -29,7 +29,7 @@ class OperationLog(Base):
     action_type = Column(String(50), nullable=False, index=True, comment="行为类型")
 
     # 模块：操作所属的功能模块
-    # 例如：用户管理、知识图谱、智能问答等
+    # 例如：用户管理、知识图谱、智能问答、数据导入等
     module = Column(String(50), nullable=False, index=True, comment="操作模块")
 
     # IP地址：记录操作来源IP

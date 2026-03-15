@@ -12,35 +12,16 @@ logger = logging.getLogger(__name__)
 class KnowledgeGraphService:
     """知识图谱服务类"""
 
-    # 可搜索的字段列表（按节点类型）
-    SEARCH_FIELDS = {
-        '设备': ['设备名称', '设备型号', '所在工位'],
-        '人员': ['姓名', '工号'],
-        '工艺': ['工艺名称', '工艺编号'],
-        '物料': ['物料名称', '物料编号'],
-        '故障': ['故障名称', '故障现象', '故障原因'],
-        '加工设备': ['设备名称', '设备型号', '所在工位'],
-        '检测设备': ['设备名称', '设备型号', '所在工位'],
-        '物流设备': ['设备名称', '设备型号', '所在工位'],
-        '辅助设备': ['设备名称', '设备型号', '所在工位'],
-        '操作人员': ['姓名', '工号'],
-        '技术人员': ['姓名', '工号'],
-        '管理人员': ['姓名', '工号'],
-        '原材料': ['物料名称', '物料编号'],
-        '半成品': ['物料名称', '物料编号'],
-        '成品': ['物料名称', '物料编号'],
-        '辅料': ['物料名称', '物料编号'],
-        '加工工艺': ['工艺名称', '工艺编号'],
-        '检测工艺': ['工艺名称', '工艺编号'],
-        '装配工艺': ['工艺名称', '工艺编号'],
-    }
+    # 宽松模式：搜索所有节点属性，不再限制特定字段
+    # 任何包含关键词的属性都会被匹配（包括维护周期、出厂日期等）
 
     @staticmethod
     def search_all_nodes(keyword: str, limit: int = 100) -> Dict[str, Any]:
         """
-        多字段智能搜索节点
+        宽松模式：搜索节点的所有属性字段
 
-        在所有可搜索字段中进行模糊匹配
+        任何属性包含关键词的节点都会被返回
+        例如：搜索"10天"可以找到维护周期为10天的设备
 
         Args:
             keyword: 关键词
@@ -75,27 +56,17 @@ class KnowledgeGraphService:
     @staticmethod
     def _search_by_multiple_fields(keyword: str, limit: int) -> tuple:
         """
-        多字段模糊匹配搜索
+        宽松模式：搜索节点的所有属性字段
+        不再限制特定字段，任何属性包含关键词都会被匹配
 
         Returns:
             tuple: (节点列表, 节点ID列表)
         """
-        # 构建所有可搜索字段的列表
-        all_fields = []
-        for fields in KnowledgeGraphService.SEARCH_FIELDS.values():
-            all_fields.extend(fields)
-        all_fields = list(set(all_fields))  # 去重
-
-        # 构建 WHERE 条件
-        where_conditions = []
-        for field in all_fields:
-            where_conditions.append(f"toString(n.{field}) CONTAINS $keyword")
-
-        where_clause = " OR ".join(where_conditions)
-
-        search_query = f"""
+        # 宽松模式：搜索所有属性字段
+        # 使用 any() + WHERE 语法检查节点的任何属性是否包含关键词
+        search_query = """
         MATCH (n)
-        WHERE {where_clause}
+        WHERE any(key IN keys(n) WHERE toString(n[key]) CONTAINS $keyword)
         RETURN elementId(n) as id, labels(n) as labels, properties(n) as properties
         LIMIT $limit
         """
@@ -126,7 +97,9 @@ class KnowledgeGraphService:
     @staticmethod
     def _get_relations_between_nodes(node_ids: list) -> list:
         """
-        获取指定节点列表之间的关系
+        获取指定节点列表之间的关系（保留方向）
+
+        使用有向模式 (a)-[r]->(b) 确保从头实体指向尾实体
 
         Args:
             node_ids: 节点ID列表
@@ -139,8 +112,9 @@ class KnowledgeGraphService:
 
         for i in range(0, len(node_ids), batch_size):
             batch = node_ids[i:i + batch_size]
+            # 使用有向关系模式，并直接在 Cypher 中获取起始和结束节点的 elementId
             rel_query = """
-            MATCH (a)-[r]-(b)
+            MATCH (a)-[r]->(b)
             WHERE elementId(a) IN $node_ids AND elementId(b) IN $node_ids
             RETURN elementId(a) as from_node, elementId(b) as to_node, type(r) as type, elementId(r) as rel_id
             """
@@ -165,7 +139,7 @@ class KnowledgeGraphService:
     @staticmethod
     def get_node_neighbors(node_id: str, depth: int = 1) -> Dict[str, Any]:
         """
-        获取指定节点的邻居节点和关系
+        获取指定节点的邻居节点和关系（保留方向）
 
         Args:
             node_id: 节点的 elementId
@@ -175,9 +149,10 @@ class KnowledgeGraphService:
             包含邻居节点和关系的字典
         """
         try:
-            # 查询指定节点的邻居
-            neighbor_query = f"""
-            MATCH (n)-[r]-(neighbor)
+            # 使用有向关系模式查询邻居，同时获取出边和入边
+            # 查询出边：中心节点 -> 邻居
+            outgoing_query = """
+            MATCH (n)-[r]->(neighbor)
             WHERE elementId(n) = $node_id
             RETURN elementId(n) as center_id,
                    elementId(neighbor) as id,
@@ -185,18 +160,29 @@ class KnowledgeGraphService:
                    properties(neighbor) as properties,
                    elementId(r) as rel_id,
                    type(r) as rel_type,
-                   startNode(r) as start_node,
-                   endNode(r) as end_node
+                   elementId(n) as from_node,
+                   elementId(neighbor) as to_node
             """
 
-            results = neo4j_client.execute_query(
-                neighbor_query,
-                {"node_id": node_id}
-            )
+            # 查询入边：邻居 -> 中心节点
+            incoming_query = """
+            MATCH (neighbor)-[r]->(n)
+            WHERE elementId(n) = $node_id
+            RETURN elementId(n) as center_id,
+                   elementId(neighbor) as id,
+                   labels(neighbor) as labels,
+                   properties(neighbor) as properties,
+                   elementId(r) as rel_id,
+                   type(r) as rel_type,
+                   elementId(neighbor) as from_node,
+                   elementId(n) as to_node
+            """
 
             nodes = {}
             edges = []
 
+            # 处理出边
+            results = neo4j_client.execute_query(outgoing_query, {"node_id": node_id})
             for record in results:
                 neighbor_id = record.get("id")
                 neighbor_labels = record.get("labels", [])
@@ -209,38 +195,45 @@ class KnowledgeGraphService:
                         "properties": neighbor_properties if isinstance(neighbor_properties, dict) else {}
                     }
 
-                # 添加关系
                 rel_id = record.get("rel_id")
                 rel_type = record.get("rel_type", "")
+                from_id = record.get("from_node")
+                to_id = record.get("to_node")
 
-                if rel_id is not None:
-                    # 确定关系的方向
-                    start_node = record.get("start_node")
-                    end_node = record.get("end_node")
+                if rel_id is not None and from_id and to_id:
+                    edges.append({
+                        "id": rel_id,
+                        "from_node": from_id,
+                        "to_node": to_id,
+                        "type": rel_type
+                    })
 
-                    # Neo4j 返回的节点对象，需要提取 elementId
-                    if start_node and end_node:
-                        if isinstance(start_node, dict):
-                            from_id = start_node.get("identity") or start_node.get("id")
-                        else:
-                            from_id = getattr(start_node, "id", None)
+            # 处理入边
+            results = neo4j_client.execute_query(incoming_query, {"node_id": node_id})
+            for record in results:
+                neighbor_id = record.get("id")
+                neighbor_labels = record.get("labels", [])
+                neighbor_properties = record.get("properties", {})
 
-                        if isinstance(end_node, dict):
-                            to_id = end_node.get("identity") or end_node.get("id")
-                        else:
-                            to_id = getattr(end_node, "id", None)
+                if neighbor_id and neighbor_id not in nodes:
+                    nodes[neighbor_id] = {
+                        "id": neighbor_id,
+                        "labels": neighbor_labels if isinstance(neighbor_labels, list) else [],
+                        "properties": neighbor_properties if isinstance(neighbor_properties, dict) else {}
+                    }
 
-                        # 如果无法提取，使用节点ID
-                        if not from_id or not to_id:
-                            from_id = node_id
-                            to_id = neighbor_id
+                rel_id = record.get("rel_id")
+                rel_type = record.get("rel_type", "")
+                from_id = record.get("from_node")
+                to_id = record.get("to_node")
 
-                        edges.append({
-                            "id": rel_id,
-                            "from_node": from_id,
-                            "to_node": to_id,
-                            "type": rel_type
-                        })
+                if rel_id is not None and from_id and to_id:
+                    edges.append({
+                        "id": rel_id,
+                        "from_node": from_id,
+                        "to_node": to_id,
+                        "type": rel_type
+                    })
 
             logger.info(f"节点 {node_id} 的邻居: {len(nodes)} 个节点, {len(edges)} 条关系")
             return {

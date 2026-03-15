@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 
-from app.models.user import get_db, UserManage
+from app.models import get_db, UserManage
 from app.schemas.user import UserCreate, UserUpdate, UserResponse, UserListResponse
 from app.services.user_service import UserService
 from app.services.operation_log_service import OperationLogService

@@ -56,10 +56,16 @@
 /**
  * Neo4j 图谱可视化组件
  * 使用 vis-network 展示节点和关系
+ *
+ * 交互说明：
+ * - 单击节点：展开/回收邻居节点
+ * - 双击节点：查看节点详情
  */
 import { ref, onMounted, onBeforeUnmount, watch, nextTick, computed } from 'vue'
 import { Network } from 'vis-network/standalone'
 import 'vis-network/styles/vis-network.css'
+import { knowledgeGraphApi } from '@/api/knowledge-graph'
+import { ElMessage } from 'element-plus'
 
 const props = defineProps({
   nodes: {
@@ -79,9 +85,24 @@ let network = null
 const nodeCount = ref(0)
 const edgeCount = ref(0)
 
+// 用于区分单击和双击
+let clickTimer = null
+let clickNode = null
+const DOUBLE_CLICK_DELAY = 250 // 双击检测延迟（毫秒）
+
 // 详情面板
 const detailDrawerVisible = ref(false)
 const selectedNode = ref(null)
+
+// 本地图谱数据（用于支持展开/回收）
+const localNodes = ref([])
+const localEdges = ref([])
+
+// 跟踪已展开的节点（存储节点ID）
+const expandedNodes = ref(new Set())
+
+// 跟踪初始节点（用于回收时保留）
+const initialNodeIds = ref(new Set())
 
 // 计算显示的属性（过滤掉空值和内部字段）
 const displayProperties = computed(() => {
@@ -211,17 +232,18 @@ const getNodeOptions = (node) => {
 
   const mainType = getMainType(node)
   const label = getNodeLabel(node)
+  const isExpanded = expandedNodes.value.has(node.id)
 
   return {
     id: node.id,
     label: label,
-    title: `点击查看详情`, // 鼠标悬停提示
+    title: isExpanded ? '单击回收，双击查看详情' : '单击展开，双击查看详情',
     color: colorMap[mainType] || colorMap.default,
     font: {
       size: 14,
       color: '#2c3e50'
     },
-    borderWidth: 2,
+    borderWidth: isExpanded ? 4 : 2,
     borderWidthSelected: 3,
     shape: 'box',
     margin: 10,
@@ -257,8 +279,7 @@ const getEdgeOptions = (edge) => {
       color: '#7f8c8d'
     },
     smooth: {
-      type: 'curvedCW',
-      roundness: 0.2
+      type: false
     }
   }
 }
@@ -267,11 +288,16 @@ const getEdgeOptions = (edge) => {
 const initGraph = () => {
   if (!graphContainer.value) return
 
-  const visNodes = props.nodes
+  // 初始化本地数据
+  localNodes.value = [...props.nodes]
+  localEdges.value = [...props.edges]
+  initialNodeIds.value = new Set(props.nodes.map(n => n.id))
+
+  const visNodes = localNodes.value
     .map(getNodeOptions)
     .filter(node => node !== null)
 
-  const visEdges = props.edges
+  const visEdges = localEdges.value
     .map(getEdgeOptions)
     .filter(edge => edge !== null)
 
@@ -296,7 +322,10 @@ const initGraph = () => {
     },
     edges: {
       width: 2,
-      selectionWidth: 3
+      selectionWidth: 3,
+      smooth: {
+        type: false
+      }
     },
     physics: {
       enabled: true,
@@ -346,11 +375,53 @@ const initGraph = () => {
     })
   })
 
-  // 点击节点事件 - 显示详情
+  // 单击节点事件 - 展开/回收邻居（延迟执行以等待双击）
   network.on('click', (params) => {
     if (params.nodes.length > 0) {
       const nodeId = params.nodes[0]
-      const node = props.nodes.find(n => n.id === nodeId)
+      clickNode = nodeId
+
+      // 清除之前的定时器
+      if (clickTimer) {
+        clearTimeout(clickTimer)
+      }
+
+      // 延迟执行，如果在此期间触发了双击则取消
+      clickTimer = setTimeout(async () => {
+        const node = localNodes.value.find(n => n.id === nodeId)
+        if (node) {
+          network.selectNodes([nodeId])
+
+          if (expandedNodes.value.has(nodeId)) {
+            // 已展开，则回收
+            await collapseNode(nodeId)
+          } else {
+            // 未展开，则展开
+            await expandNode(nodeId)
+          }
+
+          emit('node-click', { nodeId, node })
+        }
+        clickTimer = null
+        clickNode = null
+      }, DOUBLE_CLICK_DELAY)
+    } else {
+      // 点击空白处关闭详情面板
+      detailDrawerVisible.value = false
+    }
+  })
+
+  // 双击节点事件 - 显示详情
+  network.on('doubleClick', (params) => {
+    // 取消单击事件
+    if (clickTimer) {
+      clearTimeout(clickTimer)
+      clickTimer = null
+    }
+
+    if (params.nodes.length > 0) {
+      const nodeId = params.nodes[0]
+      const node = localNodes.value.find(n => n.id === nodeId)
 
       network.selectNodes([nodeId])
 
@@ -358,29 +429,10 @@ const initGraph = () => {
       selectedNode.value = node
       detailDrawerVisible.value = true
 
-      // 同时发出事件给父组件
-      emit('node-click', { nodeId, node })
-    } else {
-      // 点击空白处关闭详情面板
-      detailDrawerVisible.value = false
-    }
-  })
-
-  // 双击节点事件 - 适配视图
-  network.on('doubleClick', (params) => {
-    if (params.nodes.length > 0) {
-      const nodeId = params.nodes[0]
-      network.fit({
-        nodes: [nodeId],
-        animation: {
-          duration: 500,
-          easingFunction: 'easeInOutQuad'
-        }
-      })
-
-      const node = props.nodes.find(n => n.id === nodeId)
       emit('node-double-click', { nodeId, node })
     }
+
+    clickNode = null
   })
 
   // 悬停节点事件 - 高亮边
@@ -394,15 +446,128 @@ const initGraph = () => {
   })
 }
 
+// 展开节点：获取并显示邻居节点
+const expandNode = async (nodeId) => {
+  try {
+    const result = await knowledgeGraphApi.getNodeNeighbors(nodeId)
+
+    if (result && result.nodes && result.edges) {
+      // 添加新节点（避免重复）
+      const newNodeIds = []
+      for (const newNode of result.nodes) {
+        if (!localNodes.value.find(n => n.id === newNode.id)) {
+          localNodes.value.push(newNode)
+          newNodeIds.push(newNode.id)
+        }
+      }
+
+      // 添加新关系
+      for (const newEdge of result.edges) {
+        if (!localEdges.value.find(e => e.id === newEdge.id)) {
+          localEdges.value.push(newEdge)
+        }
+      }
+
+      // 标记为已展开
+      expandedNodes.value.add(nodeId)
+
+      // 更新图谱显示
+      updateLocalGraph()
+
+      // 适配视图包含新节点
+      network.fit({
+        nodes: [nodeId, ...newNodeIds],
+        animation: { duration: 300 }
+      })
+
+      if (newNodeIds.length > 0) {
+        ElMessage.success(`展开了 ${newNodeIds.length} 个邻居节点`)
+      } else {
+        ElMessage.info('该节点没有更多邻居了')
+      }
+    }
+  } catch (error) {
+    console.error('展开节点失败:', error)
+    ElMessage.error('展开节点失败')
+  }
+}
+
+// 回收节点：移除该节点的所有邻居（保留初始节点）
+const collapseNode = (nodeId) => {
+  // 获取要保留的节点ID集合
+  const nodesToKeep = new Set(initialNodeIds.value)
+
+  // 遍历已展开的节点（不包括当前节点）
+  for (const expandedId of expandedNodes.value) {
+    if (expandedId !== nodeId) {
+      nodesToKeep.add(expandedId)
+    }
+  }
+
+  // 获取需要移除的节点
+  const neighborNodeIds = new Set()
+  for (const edge of localEdges.value) {
+    if (edge.from_node === nodeId || edge.to_node === nodeId) {
+      if (edge.from_node !== nodeId) neighborNodeIds.add(edge.from_node)
+      if (edge.to_node !== nodeId) neighborNodeIds.add(edge.to_node)
+    }
+  }
+
+  // 移除非初始节点的邻居
+  const removedCount = localNodes.value.filter(n => neighborNodeIds.has(n.id)).length
+  localNodes.value = localNodes.value.filter(n => !neighborNodeIds.has(n.id) || nodesToKeep.has(n.id))
+
+  // 移除相关的关系
+  const edgesToRemove = new Set()
+  for (const neighborId of neighborNodeIds) {
+    for (const edge of localEdges.value) {
+      if (edge.from_node === neighborId || edge.to_node === neighborId) {
+        edgesToRemove.add(edge.id)
+      }
+    }
+  }
+
+  localEdges.value = localEdges.value.filter(e => !edgesToRemove.has(e.id))
+
+  // 从已展开集合中移除
+  expandedNodes.value.delete(nodeId)
+
+  // 更新图谱显示
+  updateLocalGraph()
+
+  // 适配视图
+  network.fit({
+    nodes: Array.from(nodesToKeep),
+    animation: { duration: 300 }
+  })
+
+  if (removedCount > 0) {
+    ElMessage.info(`收回了 ${removedCount} 个节点`)
+  }
+}
+
 // 更新图谱数据
 const updateGraph = () => {
   if (!network) return
 
-  const visNodes = props.nodes
+  // 重置本地数据为props数据（当外部数据变化时）
+  localNodes.value = [...props.nodes]
+  localEdges.value = [...props.edges]
+  initialNodeIds.value = new Set(props.nodes.map(n => n.id))
+  expandedNodes.value.clear()
+
+  updateLocalGraph()
+}
+
+// 更新本地图谱数据（用于展开/回收）
+const updateLocalGraph = () => {
+  if (!network) return
+
+  const visNodes = localNodes.value
     .map(getNodeOptions)
     .filter(node => node !== null)
 
-  const visEdges = props.edges
+  const visEdges = localEdges.value
     .map(getEdgeOptions)
     .filter(edge => edge !== null)
 
@@ -413,8 +578,6 @@ const updateGraph = () => {
     nodes: visNodes,
     edges: visEdges
   })
-
-  triggerAnimation()
 }
 
 // 触发流动动画效果
@@ -474,6 +637,7 @@ const zoomOut = () => {
 
 // 监听数据变化
 watch(() => [props.nodes, props.edges], () => {
+  // 当外部数据变化时，重置本地数据
   updateGraph()
 }, { deep: true })
 

@@ -31,6 +31,11 @@
             <el-icon><Share /></el-icon>
             <template #title>知识图谱</template>
           </el-menu-item>
+          <!-- 数据导入菜单：仅管理员可见 -->
+          <el-menu-item v-if="authStore.isAdmin" index="/data-import">
+            <el-icon><Upload /></el-icon>
+            <template #title>数据导入</template>
+          </el-menu-item>
           <!-- 操作日志菜单：仅管理员可见 -->
           <el-menu-item v-if="authStore.isAdmin" index="/operation-logs">
             <el-icon><Document /></el-icon>
@@ -102,6 +107,7 @@ const pageTitle = computed(() => {
     '/users': '用户管理',
     '/chat': '智能问答',
     '/knowledge-graph': '知识图谱',
+    '/data-import': '数据导入',
     '/operation-logs': '操作日志'
   }
   return titleMap[route.path] || '车间资源系统'
